@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Password Vault"
+version = "1.0.0"
+id = "artifacts/password-vault"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21657
+
+[services.development]
+run = "pnpm --filter @workspace/password-vault run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/password-vault", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/password-vault/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21657"
+BASE_PATH = "/"
