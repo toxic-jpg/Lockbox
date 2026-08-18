@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useVault } from '@/context/VaultContext';
 import { VaultCard } from '@/components/VaultCard';
+import { fuzzyMatches } from '@/utils/search';
+import { AppIcon } from '@/components/AppIcon';
 
 type Filter = 'all' | 'favorites' | 'weak' | 'strong' | '2fa';
 type Sort = 'az' | 'za' | 'newest' | 'oldest' | 'recent';
@@ -17,6 +19,12 @@ export default function VaultScreen() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [sort, setSort] = useState<Sort>('newest');
+  const [manageMode, setManageMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkTags, setBulkTags] = useState('');
+  const [bulkFolder, setBulkFolder] = useState('');
+  const { bulkUpdateEntries } = useVault();
 
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
   const botPad = Platform.OS === 'web' ? 34 : insets.bottom;
@@ -25,7 +33,9 @@ export default function VaultScreen() {
     let list = entries;
     if (query) {
       const q = query.toLowerCase();
-      list = list.filter(e => e.title.toLowerCase().includes(q) || (e.username ?? '').toLowerCase().includes(q) || (e.email ?? '').toLowerCase().includes(q));
+      list = list.filter(e => fuzzyMatches(q, [
+        e.title, e.username ?? '', e.email ?? '', e.url ?? '', e.folder ?? '', ...(e.tags ?? []),
+      ]));
     }
     if (filter === 'favorites') list = list.filter(e => e.isFavorite);
     else if (filter === 'weak') list = list.filter(e => e.strength <= 1);
@@ -41,6 +51,30 @@ export default function VaultScreen() {
     });
   }, [entries, query, filter, sort]);
 
+  function toggleSelected(id: string) {
+    setSelectedIds(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function closeManageMode() {
+    setManageMode(false);
+    setSelectedIds(new Set());
+  }
+
+  async function applyBulkEdit() {
+    await bulkUpdateEntries(Array.from(selectedIds), {
+      tags: bulkTags.split(',').map(tag => tag.trim()).filter(Boolean),
+      folder: bulkFolder.trim() || undefined,
+    });
+    setBulkOpen(false);
+    closeManageMode();
+    setBulkTags('');
+    setBulkFolder('');
+  }
+
   const filters: { key: Filter; label: string; icon: string }[] = [
     { key: 'all', label: 'All', icon: 'grid' },
     { key: 'favorites', label: 'Favorites', icon: 'star' },
@@ -53,8 +87,14 @@ export default function VaultScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Vault</Text>
-        <Text style={[styles.count, { color: colors.mutedForeground }]}>{processed.length} items</Text>
+        <View>
+          <Text style={[styles.title, { color: colors.foreground }]}>Vault</Text>
+          <Text style={[styles.count, { color: colors.mutedForeground }]}>{manageMode ? `${selectedIds.size} selected` : `${processed.length} items`}</Text>
+        </View>
+        <Pressable style={[styles.manageBtn, { backgroundColor: manageMode ? colors.primary : colors.muted }]} onPress={() => manageMode ? closeManageMode() : setManageMode(true)}>
+          <AppIcon name={manageMode ? 'close' : 'checkmark-circle-outline'} size={17} color={manageMode ? '#fff' : colors.primary} />
+          <Text style={[styles.manageText, { color: manageMode ? '#fff' : colors.primary }]}>{manageMode ? 'Done' : 'Manage'}</Text>
+        </Pressable>
       </View>
 
       {/* Search */}
@@ -113,16 +153,42 @@ export default function VaultScreen() {
             </Text>
           </View>
         }
-        renderItem={({ item }) => <VaultCard entry={item} />}
+         renderItem={({ item }) => (
+           <VaultCard
+             entry={item}
+             selectable={manageMode}
+             selected={selectedIds.has(item.id)}
+             onPress={manageMode ? () => toggleSelected(item.id) : undefined}
+           />
+         )}
       />
 
       {/* FAB */}
-      <Pressable
-        style={[styles.fab, { backgroundColor: colors.primary }]}
-        onPress={() => router.push('/add')}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </Pressable>
+      {!manageMode && <Pressable style={[styles.fab, { backgroundColor: colors.primary }]} onPress={() => router.push('/add')}>
+        <AppIcon name="add" size={28} color="#fff" />
+      </Pressable>}
+      {manageMode && selectedIds.size > 0 && <View style={[styles.batchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.batchCount, { color: colors.foreground }]}>{selectedIds.size} selected</Text>
+        <Pressable style={[styles.batchBtn, { backgroundColor: colors.primary }]} onPress={() => setBulkOpen(true)}>
+          <AppIcon name="create-outline" size={17} color="#fff" />
+          <Text style={styles.batchBtnText}>Edit tags & folder</Text>
+        </Pressable>
+      </View>}
+      <Modal visible={bulkOpen} transparent animationType="slide" onRequestClose={() => setBulkOpen(false)}>
+        <KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Batch edit</Text>
+            <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>Apply to {selectedIds.size} selected entries</Text>
+            <TextInput style={[styles.modalInput, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="Tags, separated by commas" placeholderTextColor={colors.mutedForeground} value={bulkTags} onChangeText={setBulkTags} autoCapitalize="none" />
+            <TextInput style={[styles.modalInput, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="Folder name" placeholderTextColor={colors.mutedForeground} value={bulkFolder} onChangeText={setBulkFolder} />
+            <Text style={[styles.modalHint, { color: colors.mutedForeground }]}>Leaving a field blank clears it for selected entries.</Text>
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.modalCancel, { backgroundColor: colors.muted }]} onPress={() => setBulkOpen(false)}><Text style={[styles.modalCancelText, { color: colors.foreground }]}>Cancel</Text></Pressable>
+              <Pressable style={[styles.modalApply, { backgroundColor: colors.primary }]} onPress={applyBulkEdit}><Text style={styles.modalApplyText}>Apply changes</Text></Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -132,6 +198,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   title: { fontSize: 26, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
   count: { fontSize: 13, fontFamily: 'Inter_400Regular', paddingBottom: 4 },
+  manageBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10 },
+  manageText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   searchRow: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
   searchBox: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   searchInput: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular' },
@@ -143,4 +211,19 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   emptySub: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 40 },
   fab: { position: 'absolute', right: 20, bottom: 100, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+  batchBar: { position: 'absolute', left: 16, right: 16, bottom: 90, borderWidth: 1, borderRadius: 14, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  batchCount: { flex: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  batchBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 },
+  batchBtnText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  modalCard: { borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, gap: 12 },
+  modalTitle: { fontSize: 20, fontFamily: 'Inter_700Bold' },
+  modalSub: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  modalInput: { borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 12, fontSize: 15, fontFamily: 'Inter_400Regular' },
+  modalHint: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  modalCancel: { flex: 1, paddingVertical: 13, borderRadius: 11, alignItems: 'center' },
+  modalCancelText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  modalApply: { flex: 1, paddingVertical: 13, borderRadius: 11, alignItems: 'center' },
+  modalApplyText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
 });

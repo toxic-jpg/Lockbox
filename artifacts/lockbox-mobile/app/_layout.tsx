@@ -15,6 +15,8 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { VaultProvider, useVault } from '@/context/VaultContext';
 import LockScreen from '@/components/LockScreen';
+import { AppearanceProvider } from '@/context/AppearanceContext';
+import { KeyboardShortcuts } from '@/components/KeyboardShortcuts';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -26,13 +28,16 @@ function RootLayoutNav() {
   if (isLoading) return null;
   if (!isUnlocked) return <LockScreen />;
 
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="add" options={{ presentation: 'modal', headerShown: false }} />
-      <Stack.Screen name="entry/[id]" options={{ headerShown: false }} />
-    </Stack>
-  );
+    return (
+      <>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="add" options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="entry/[id]" options={{ headerShown: false }} />
+        </Stack>
+        <KeyboardShortcuts />
+      </>
+    );
 }
 
 export default function RootLayout() {
@@ -52,18 +57,20 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
-              <VaultProvider>
-                <RootLayoutNav />
-              </VaultProvider>
-            </KeyboardProvider>
-          </GestureHandlerRootView>
-        </QueryClientProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <AppearanceProvider>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <QueryClientProvider client={queryClient}>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <KeyboardProvider>
+                <VaultProvider>
+                  <RootLayoutNav />
+                </VaultProvider>
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </QueryClientProvider>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </AppearanceProvider>
   );
 }

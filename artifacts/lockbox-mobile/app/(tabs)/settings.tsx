@@ -5,11 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useVault } from '@/context/VaultContext';
+import { ACCENT_COLORS, useAppearance } from '@/context/AppearanceContext';
+import { SHORTCUTS } from '@/components/KeyboardShortcuts';
+import { AppIcon } from '@/components/AppIcon';
 
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { entries, settings, updateSettings, clearAllData, lock } = useVault();
+  const { accentColor, iconPack, updateAppearance } = useAppearance();
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
   const botPad = Platform.OS === 'web' ? 34 : insets.bottom;
 
@@ -118,6 +122,27 @@ export default function SettingsScreen() {
           onChange={v => updateSettings({ clipboardTimeout: v })}
         />
 
+        <SectionHeader title="APPEARANCE" />
+        <View style={[styles.appearanceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.segmentLabel, { color: colors.foreground }]}>Accent color</Text>
+          <View style={styles.accentChoices}>
+            {ACCENT_COLORS.map(color => (
+              <Pressable key={color} onPress={() => updateAppearance({ accentColor: color })} style={[styles.accentChoice, { backgroundColor: color }, accentColor === color && styles.accentChoiceActive]}>
+                {accentColor === color && <AppIcon name="checkmark" size={15} color="#fff" />}
+              </Pressable>
+            ))}
+          </View>
+          <Text style={[styles.segmentLabel, { color: colors.foreground, marginTop: 8 }]}>Icon pack</Text>
+          <View style={styles.iconPackRow}>
+            {(['ionicons', 'feather'] as const).map(pack => (
+              <Pressable key={pack} onPress={() => updateAppearance({ iconPack: pack })} style={[styles.iconPackBtn, { backgroundColor: iconPack === pack ? colors.primary : colors.muted }]}>
+                <AppIcon name={pack === 'ionicons' ? 'sparkles' : 'edit-outline'} size={16} color={iconPack === pack ? '#fff' : colors.mutedForeground} />
+                <Text style={[styles.iconPackText, { color: iconPack === pack ? '#fff' : colors.mutedForeground }]}>{pack === 'ionicons' ? 'Ionicons' : 'Feather'}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         <SectionHeader title="VAULT" />
         <View style={[styles.group, { borderColor: colors.border }]}>
           <SettingRow
@@ -152,6 +177,15 @@ export default function SettingsScreen() {
         <Text style={[styles.footnote, { color: colors.mutedForeground }]}>
           All data is stored locally on your device. Nothing is sent to any server.
         </Text>
+        <SectionHeader title="KEYBOARD SHORTCUTS" />
+        <View style={[styles.group, { borderColor: colors.border }]}>
+          {SHORTCUTS.map(shortcut => (
+            <View key={shortcut.keys} style={[styles.shortcutRow, { backgroundColor: colors.card }]}>
+              <Text style={[styles.shortcutAction, { color: colors.foreground }]}>{shortcut.action}</Text>
+              <Text style={[styles.shortcutKeys, { color: colors.primary }]}>{shortcut.keys}</Text>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
@@ -177,5 +211,15 @@ const styles = StyleSheet.create({
   segments: { flexDirection: 'row', gap: 6 },
   segment: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
   segmentText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  appearanceCard: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
+  accentChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  accentChoice: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  accentChoiceActive: { borderWidth: 3, borderColor: '#fff', transform: [{ scale: 1.12 }] },
+  iconPackRow: { flexDirection: 'row', gap: 8 },
+  iconPackBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 9, paddingVertical: 9 },
+  iconPackText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  shortcutRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#182038' },
+  shortcutAction: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  shortcutKeys: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   footnote: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 18, marginTop: 8 },
 });

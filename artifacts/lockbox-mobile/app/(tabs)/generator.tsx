@@ -3,9 +3,9 @@ import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
+import { useVault } from '@/context/VaultContext';
 import { StrengthMeter } from '@/components/StrengthMeter';
 import {
   calculateStrength,
@@ -28,6 +28,7 @@ const MODES: { key: Mode; label: string; icon: string }[] = [
 export default function GeneratorScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { copyToClipboard } = useVault();
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
   const botPad = Platform.OS === 'web' ? 34 : insets.bottom;
 
@@ -48,6 +49,7 @@ export default function GeneratorScreen() {
   const [wordCount, setWordCount] = useState(4);
   const [separator, setSeparator] = useState('-');
   const [capitalize, setCapitalize] = useState(true);
+  const [memorableWords, setMemorableWords] = useState(true);
 
   // PIN opts
   const [pinLength, setPinLength] = useState(6);
@@ -59,7 +61,7 @@ export default function GeneratorScreen() {
       result = generatePassword(opts);
       setStrength(calculateStrength(result));
     } else if (mode === 'passphrase') {
-      result = generatePassphrase(wordCount, separator, capitalize);
+      result = generatePassphrase(wordCount, separator, capitalize, memorableWords);
       setStrength(calculateStrength(result));
     } else if (mode === 'pin') {
       result = generatePin(pinLength);
@@ -70,13 +72,13 @@ export default function GeneratorScreen() {
     }
     setGenerated(result);
     setCopied(false);
-  }, [mode, length, uppercase, lowercase, numbers, symbols, excludeSimilar, wordCount, separator, capitalize, pinLength]);
+  }, [mode, length, uppercase, lowercase, numbers, symbols, excludeSimilar, wordCount, separator, capitalize, memorableWords, pinLength]);
 
   useEffect(() => { generate(); }, [mode]);
 
   async function handleCopy() {
     if (!generated) return;
-    await Clipboard.setStringAsync(generated);
+    await copyToClipboard(generated);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -197,6 +199,7 @@ export default function GeneratorScreen() {
                 </View>
               </View>
               <ToggleRow label="Capitalize Words" value={capitalize} onToggle={setCapitalize} />
+              <ToggleRow label="Memorable words" sub="Use friendly, easy-to-recall words" value={memorableWords} onToggle={setMemorableWords} />
             </>
           )}
           {mode === 'pin' && (

@@ -15,7 +15,8 @@
       "backgroundColor": "#07091C"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.lockbox.vault"
     },
     "android": {
       "package": "com.lockbox.vault",

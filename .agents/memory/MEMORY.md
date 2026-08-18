@@ -1,0 +1,1 @@
+- [iOS signing](ios-signing.md) — standalone iPhone installs require Apple Developer signing after cross-platform source compatibility is complete.

@@ -15,7 +15,7 @@ const COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9'
 export default function AddScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { addEntry } = useVault();
+  const { addEntry, entries } = useVault();
   const params = useLocalSearchParams<{ prefill?: string }>();
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
   const botPad = Platform.OS === 'web' ? 34 : insets.bottom;
@@ -26,6 +26,8 @@ export default function AddScreen() {
   const [password, setPassword] = useState(params.prefill ?? '');
   const [url, setUrl] = useState('');
   const [notes, setNotes] = useState('');
+  const [tagsText, setTagsText] = useState('');
+  const [folder, setFolder] = useState('');
   const [categoryId, setCategoryId] = useState('other');
   const [color, setColor] = useState(COLORS[0]);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -45,6 +47,17 @@ export default function AddScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
+  async function persistEntry() {
+    setSaving(true);
+    try {
+      await addEntry({ title: title.trim(), username: username || undefined, email: email || undefined, password, url: url || undefined, notes: notes || undefined, categoryId, folder: folder.trim() || undefined, tags: tagsText.split(',').map(tag => tag.trim()).filter(Boolean), color, isFavorite, isImportant: false, twoFactorEnabled: twoFactor, strength });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleSave() {
     if (!title.trim()) {
       Alert.alert('Required', 'Please enter a title for this entry.');
@@ -54,14 +67,26 @@ export default function AddScreen() {
       Alert.alert('Required', 'Please enter or generate a password.');
       return;
     }
-    setSaving(true);
-    try {
-      await addEntry({ title: title.trim(), username: username || undefined, email: email || undefined, password, url: url || undefined, notes: notes || undefined, categoryId, color, isFavorite, isImportant: false, twoFactorEnabled: twoFactor, strength });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-    } finally {
-      setSaving(false);
+    const normalizedUrl = url.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase();
+    const normalizedTitle = title.trim().toLowerCase();
+    const normalizedIdentity = (username || email).trim().toLowerCase();
+    const duplicate = entries.find(entry => (
+      (normalizedUrl && entry.url?.replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase() === normalizedUrl) ||
+      (normalizedIdentity && [entry.username, entry.email].filter(Boolean).some(value => value!.trim().toLowerCase() === normalizedIdentity)) ||
+      (entry.title.trim().toLowerCase() === normalizedTitle && entry.password === password)
+    ));
+    if (duplicate) {
+      Alert.alert(
+        'Possible duplicate',
+        `"${duplicate.title}" already looks like this entry. Save it anyway?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Save Anyway', onPress: persistEntry },
+        ],
+      );
+      return;
     }
+    await persistEntry();
   }
 
   function FieldLabel({ text }: { text: string }) {
@@ -158,6 +183,12 @@ export default function AddScreen() {
 
           <FieldLabel text="WEBSITE URL" />
           <InputField placeholder="https://example.com" value={url} onChangeText={setUrl} />
+
+          <FieldLabel text="FOLDER" />
+          <InputField placeholder="e.g. Personal, Work..." value={folder} onChangeText={setFolder} />
+
+          <FieldLabel text="TAGS" />
+          <InputField placeholder="Separate tags with commas" value={tagsText} onChangeText={setTagsText} />
 
           <FieldLabel text="NOTES" />
           <View style={[styles.inputWrap, styles.textArea, { backgroundColor: colors.muted, borderColor: colors.border }]}>

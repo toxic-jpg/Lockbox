@@ -19,6 +19,13 @@ const WORDLIST = [
   'wave','adobe','blaze','cedar','drift','elite','forge','grace','raven',
 ];
 
+const MEMORABLE_WORDS = [
+  'sunny', 'little', 'quiet', 'happy', 'brave', 'clever', 'bright', 'gentle',
+  'silver', 'golden', 'cosmic', 'hidden', 'magic', 'velvet', 'wild', 'calm',
+  'forest', 'river', 'meadow', 'rocket', 'planet', 'panda', 'otter', 'fox',
+  'garden', 'candle', 'coffee', 'thunder', 'rainbow', 'summer', 'moon',
+];
+
 function getRandomInt(max: number): number {
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
     const arr = new Uint32Array(1);
@@ -50,9 +57,10 @@ export function generatePassword(opts: PasswordOptions): string {
   return Array.from({ length: opts.length }, () => charset[getRandomInt(charset.length)]).join('');
 }
 
-export function generatePassphrase(wordCount: number, separator: string, capitalize: boolean): string {
+export function generatePassphrase(wordCount: number, separator: string, capitalize: boolean, memorable = false): string {
+  const list = memorable ? MEMORABLE_WORDS : WORDLIST;
   return Array.from({ length: wordCount }, () => {
-    const w = WORDLIST[getRandomInt(WORDLIST.length)];
+    const w = list[getRandomInt(list.length)];
     return capitalize ? w.charAt(0).toUpperCase() + w.slice(1) : w;
   }).join(separator);
 }

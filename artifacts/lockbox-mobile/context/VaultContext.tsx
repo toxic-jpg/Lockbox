@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import { calculateStrength, generateId } from '@/utils/crypto';
+import { faviconForUrl } from '@/utils/favicon';
 
 export interface VaultEntry {
   id: string;
@@ -11,6 +13,9 @@ export interface VaultEntry {
   notes?: string;
   url?: string;
   categoryId: string;
+  folder?: string;
+  tags: string[];
+  faviconUrl?: string;
   color: string;
   isFavorite: boolean;
   isImportant: boolean;
@@ -46,10 +51,10 @@ export interface AppSettings {
 const DEFAULT_SETTINGS: AppSettings = { clipboardTimeout: 30, autoLockTimeout: 5 };
 
 const SEED_ENTRIES: Omit<VaultEntry, 'id' | 'createdAt' | 'updatedAt'>[] = [
-  { title: 'GitHub', username: 'dev@example.com', email: 'dev@example.com', password: 'Gh!tHub#Secure2024', url: 'https://github.com', categoryId: 'work', color: '#6366f1', isFavorite: true, isImportant: false, twoFactorEnabled: true, strength: 4 },
-  { title: 'Gmail', username: 'me@gmail.com', email: 'me@gmail.com', password: 'G00gl3P@ssw0rd!', url: 'https://gmail.com', categoryId: 'work', color: '#f43f5e', isFavorite: true, isImportant: true, twoFactorEnabled: false, strength: 3 },
-  { title: 'Netflix', username: 'movies@example.com', email: 'movies@example.com', password: 'netflix123', url: 'https://netflix.com', categoryId: 'entertainment', color: '#f59e0b', isFavorite: false, isImportant: false, twoFactorEnabled: false, strength: 1 },
-  { title: 'Discord', username: 'gamer#1234', password: 'D!sc0rd$ecure99', url: 'https://discord.com', categoryId: 'gaming', color: '#8b5cf6', isFavorite: false, isImportant: false, twoFactorEnabled: true, strength: 3 },
+  { title: 'GitHub', username: 'dev@example.com', email: 'dev@example.com', password: 'Gh!tHub#Secure2024', url: 'https://github.com', categoryId: 'work', tags: [], color: '#6366f1', isFavorite: true, isImportant: false, twoFactorEnabled: true, strength: 4 },
+  { title: 'Gmail', username: 'me@gmail.com', email: 'me@gmail.com', password: 'G00gl3P@ssw0rd!', url: 'https://gmail.com', categoryId: 'work', tags: [], color: '#f43f5e', isFavorite: true, isImportant: true, twoFactorEnabled: false, strength: 3 },
+  { title: 'Netflix', username: 'movies@example.com', email: 'movies@example.com', password: 'netflix123', url: 'https://netflix.com', categoryId: 'entertainment', tags: [], color: '#f59e0b', isFavorite: false, isImportant: false, twoFactorEnabled: false, strength: 1 },
+  { title: 'Discord', username: 'gamer#1234', password: 'D!sc0rd$ecure99', url: 'https://discord.com', categoryId: 'gaming', tags: [], color: '#8b5cf6', isFavorite: false, isImportant: false, twoFactorEnabled: true, strength: 3 },
 ];
 
 const KEYS = { ENTRIES: 'lb_entries', PIN: 'lb_pin', SETTINGS: 'lb_settings' };
@@ -72,6 +77,8 @@ interface VaultCtx {
   markUsed: (id: string) => void;
   updateSettings: (u: Partial<AppSettings>) => Promise<void>;
   clearAllData: () => Promise<void>;
+  bulkUpdateEntries: (ids: string[], updates: { tags?: string[]; folder?: string }) => Promise<void>;
+  copyToClipboard: (value: string) => Promise<void>;
 }
 
 const VaultContext = createContext<VaultCtx | null>(null);
@@ -92,7 +99,12 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
         if (raw) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
         const eRaw = await AsyncStorage.getItem(KEYS.ENTRIES);
         if (eRaw) {
-          setEntries(JSON.parse(eRaw));
+          const existing = JSON.parse(eRaw) as VaultEntry[];
+          setEntries(existing.map(entry => ({
+            ...entry,
+            tags: entry.tags ?? [],
+            faviconUrl: entry.faviconUrl ?? faviconForUrl(entry.url),
+          })));
         } else {
           const now = Date.now();
           const seeded = SEED_ENTRIES.map((e, i) => ({ ...e, id: generateId(), createdAt: now - i * 86400000, updatedAt: now - i * 86400000 }));
@@ -128,7 +140,15 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
 
   const addEntry = useCallback(async (e: Omit<VaultEntry, 'id' | 'createdAt' | 'updatedAt'>): Promise<VaultEntry> => {
     const now = Date.now();
-    const entry: VaultEntry = { ...e, id: generateId(), strength: calculateStrength(e.password), createdAt: now, updatedAt: now };
+    const entry: VaultEntry = {
+      ...e,
+      tags: e.tags ?? [],
+      faviconUrl: e.faviconUrl ?? faviconForUrl(e.url),
+      id: generateId(),
+      strength: calculateStrength(e.password),
+      createdAt: now,
+      updatedAt: now,
+    };
     await save([entry, ...entries]);
     return entry;
   }, [entries, save]);
@@ -156,6 +176,23 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     updateEntry(id, { lastUsed: Date.now() });
   }, [updateEntry]);
 
+  const bulkUpdateEntries = useCallback(async (ids: string[], updates: { tags?: string[]; folder?: string }) => {
+    const selected = new Set(ids);
+    const next = entries.map(entry => selected.has(entry.id)
+      ? { ...entry, ...updates, updatedAt: Date.now() }
+      : entry);
+    await save(next);
+  }, [entries, save]);
+
+  const copyToClipboard = useCallback(async (value: string) => {
+    await Clipboard.setStringAsync(value);
+    if (settings.clipboardTimeout > 0) {
+      setTimeout(() => {
+        Clipboard.setStringAsync('').catch(() => undefined);
+      }, settings.clipboardTimeout * 1000);
+    }
+  }, [settings.clipboardTimeout]);
+
   const updateSettings = useCallback(async (u: Partial<AppSettings>) => {
     const next = { ...settings, ...u };
     setSettings(next);
@@ -171,7 +208,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <VaultContext.Provider value={{ entries, categories: DEFAULT_CATEGORIES, isUnlocked, hasPin, isLoading, settings, setupPin, unlock, lock, addEntry, updateEntry, deleteEntry, toggleFavorite, markUsed, updateSettings, clearAllData }}>
+    <VaultContext.Provider value={{ entries, categories: DEFAULT_CATEGORIES, isUnlocked, hasPin, isLoading, settings, setupPin, unlock, lock, addEntry, updateEntry, deleteEntry, toggleFavorite, markUsed, updateSettings, clearAllData, bulkUpdateEntries, copyToClipboard }}>
       {children}
     </VaultContext.Provider>
   );
