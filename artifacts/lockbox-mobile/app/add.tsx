@@ -12,6 +12,46 @@ import { calculateStrength, generatePassword } from '@/utils/crypto';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9', '#f97316', '#d946ef'];
 
+type ColorTokens = ReturnType<typeof useColors>;
+
+function FieldLabel({ text, color }: { text: string; color: string }) {
+  return <Text style={[styles.fieldLabel, { color }]}>{text}</Text>;
+}
+
+function InputField({
+  placeholder,
+  value,
+  onChangeText,
+  colors,
+  secure = false,
+  showPass = false,
+  extra,
+}: {
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  colors: ColorTokens;
+  secure?: boolean;
+  showPass?: boolean;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+      <TextInput
+        style={[styles.input, { color: colors.foreground }]}
+        placeholder={placeholder}
+        placeholderTextColor={colors.mutedForeground}
+        value={value}
+        onChangeText={onChangeText}
+        secureTextEntry={secure && !showPass}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      {extra}
+    </View>
+  );
+}
+
 export default function AddScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -89,28 +129,6 @@ export default function AddScreen() {
     await persistEntry();
   }
 
-  function FieldLabel({ text }: { text: string }) {
-    return <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{text}</Text>;
-  }
-
-  function InputField({ placeholder, value, onChangeText, secure, extra }: { placeholder: string; value: string; onChangeText: (t: string) => void; secure?: boolean; extra?: React.ReactNode }) {
-    return (
-      <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-        <TextInput
-          style={[styles.input, { color: colors.foreground }]}
-          placeholder={placeholder}
-          placeholderTextColor={colors.mutedForeground}
-          value={value}
-          onChangeText={onChangeText}
-          secureTextEntry={secure && !showPass}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {extra}
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -151,16 +169,16 @@ export default function AddScreen() {
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <FieldLabel text="TITLE *" />
-          <InputField placeholder="e.g. GitHub, Netflix..." value={title} onChangeText={setTitle} />
+           <FieldLabel text="TITLE *" color={colors.mutedForeground} />
+           <InputField colors={colors} placeholder="e.g. GitHub, Netflix..." value={title} onChangeText={setTitle} />
 
-          <FieldLabel text="USERNAME" />
-          <InputField placeholder="username or handle" value={username} onChangeText={setUsername} />
+           <FieldLabel text="USERNAME" color={colors.mutedForeground} />
+           <InputField colors={colors} placeholder="username or handle" value={username} onChangeText={setUsername} />
 
-          <FieldLabel text="EMAIL" />
-          <InputField placeholder="email@example.com" value={email} onChangeText={setEmail} />
+           <FieldLabel text="EMAIL" color={colors.mutedForeground} />
+           <InputField colors={colors} placeholder="email@example.com" value={email} onChangeText={setEmail} />
 
-          <FieldLabel text="PASSWORD *" />
+           <FieldLabel text="PASSWORD *" color={colors.mutedForeground} />
           <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
             <TextInput
               style={[styles.input, { color: colors.foreground }]}
@@ -181,16 +199,16 @@ export default function AddScreen() {
           </View>
           {password.length > 0 && <StrengthMeter score={strength} />}
 
-          <FieldLabel text="WEBSITE URL" />
-          <InputField placeholder="https://example.com" value={url} onChangeText={setUrl} />
+           <FieldLabel text="WEBSITE URL" color={colors.mutedForeground} />
+           <InputField colors={colors} placeholder="https://example.com" value={url} onChangeText={setUrl} />
 
-          <FieldLabel text="FOLDER" />
-          <InputField placeholder="e.g. Personal, Work..." value={folder} onChangeText={setFolder} />
+           <FieldLabel text="FOLDER" color={colors.mutedForeground} />
+           <InputField colors={colors} placeholder="e.g. Personal, Work..." value={folder} onChangeText={setFolder} />
 
-          <FieldLabel text="TAGS" />
-          <InputField placeholder="Separate tags with commas" value={tagsText} onChangeText={setTagsText} />
+           <FieldLabel text="TAGS" color={colors.mutedForeground} />
+           <InputField colors={colors} placeholder="Separate tags with commas" value={tagsText} onChangeText={setTagsText} />
 
-          <FieldLabel text="NOTES" />
+           <FieldLabel text="NOTES" color={colors.mutedForeground} />
           <View style={[styles.inputWrap, styles.textArea, { backgroundColor: colors.muted, borderColor: colors.border }]}>
             <TextInput
               style={[styles.input, { color: colors.foreground }]}
@@ -206,7 +224,7 @@ export default function AddScreen() {
 
         {/* Category */}
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <FieldLabel text="CATEGORY" />
+           <FieldLabel text="CATEGORY" color={colors.mutedForeground} />
           <View style={styles.catGrid}>
             {DEFAULT_CATEGORIES.map(cat => (
               <Pressable
