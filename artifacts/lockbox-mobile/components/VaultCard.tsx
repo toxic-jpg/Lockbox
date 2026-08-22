@@ -18,6 +18,9 @@ export function VaultCard({ entry, onPress, selectable = false, selected = false
   const colors = useColors();
   const { toggleFavorite, deleteEntry, markUsed, copyToClipboard } = useVault();
   const appear = useRef(new Animated.Value(0)).current;
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const favoriteScale = useRef(new Animated.Value(1)).current;
+  const copyScale = useRef(new Animated.Value(1)).current;
   const accentColor = entry.color || colors.primary;
   const initial = entry.title.charAt(0).toUpperCase();
 
@@ -28,35 +31,45 @@ export function VaultCard({ entry, onPress, selectable = false, selected = false
   async function handleCopy() {
     await copyToClipboard(entry.password);
     markUsed(entry.id);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   function handleDelete() {
     Alert.alert('Delete Entry', `Remove "${entry.title}" from your vault?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { deleteEntry(entry.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } },
+      { text: 'Delete', style: 'destructive', onPress: () => { deleteEntry(entry.id); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } },
     ]);
   }
 
   function handleLongPress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(entry.title, undefined, [
       { text: 'Copy Password', onPress: handleCopy },
-      entry.username ? { text: 'Copy Username', onPress: async () => { await copyToClipboard(entry.username!); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } } : null,
-      { text: 'Edit', onPress: () => router.push({ pathname: '/entry/[id]', params: { id: entry.id } }) },
+      entry.username ? { text: 'Copy Username', onPress: async () => { await copyToClipboard(entry.username!); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } } : null,
+      { text: 'Edit', onPress: () => { void Haptics.selectionAsync(); router.push({ pathname: '/entry/[id]', params: { id: entry.id } }); } },
       { text: 'Delete', style: 'destructive', onPress: handleDelete },
       { text: 'Cancel', style: 'cancel' },
     ].filter(Boolean) as any[]);
   }
 
+  function animateTo(value: number) {
+    Animated.spring(pressScale, { toValue: value, useNativeDriver: true, speed: 28, bounciness: 4 }).start();
+  }
+
+  function animateAction(scale: Animated.Value, value: number) {
+    Animated.spring(scale, { toValue: value, useNativeDriver: true, speed: 30, bounciness: 4 }).start();
+  }
+
   return (
-    <Animated.View style={{ opacity: appear, transform: [{ translateY: appear.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
+    <Animated.View style={{ opacity: appear, transform: [{ translateY: appear.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }, { scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] }) }, { scale: pressScale }] }}>
       <Pressable
         style={({ pressed }) => [
           styles.card,
-          { backgroundColor: colors.card, borderColor: selected ? colors.primary : colors.border, borderWidth: selected ? 2 : 1, opacity: pressed ? 0.85 : 1 },
+          { backgroundColor: colors.card, borderColor: selected ? colors.primary : colors.border, borderWidth: selected ? 2 : 1, opacity: pressed ? 0.92 : 1 },
         ]}
-        onPress={() => { if (onPress) onPress(); else router.push({ pathname: '/entry/[id]', params: { id: entry.id } }); }}
+        onPressIn={() => animateTo(0.985)}
+        onPressOut={() => animateTo(1)}
+        onPress={() => { void Haptics.selectionAsync(); if (onPress) onPress(); else router.push({ pathname: '/entry/[id]', params: { id: entry.id } }); }}
         onLongPress={handleLongPress}
       >
         <View style={[styles.accent, { backgroundColor: accentColor }]} />
@@ -74,12 +87,34 @@ export function VaultCard({ entry, onPress, selectable = false, selected = false
           <View style={[styles.strength, { backgroundColor: getStrengthHex(entry.strength) }]} />
           {entry.twoFactorEnabled && <AppIcon name="shield-checkmark" size={14} color={colors.primary} />}
           {selectable && <AppIcon name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={selected ? colors.primary : colors.mutedForeground} />}
-          {!selectable && <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleFavorite(entry.id); }}>
-            <AppIcon name={entry.isFavorite ? 'star' : 'star-outline'} size={18} color={entry.isFavorite ? '#f59e0b' : colors.mutedForeground} />
-          </Pressable>}
-          {!selectable && <Pressable onPress={handleCopy} style={[styles.copyBtn, { backgroundColor: colors.primary + '18' }]}>
-            <AppIcon name="copy-outline" size={16} color={colors.primary} />
-          </Pressable>}
+          {!selectable && (
+            <Animated.View style={{ transform: [{ scale: favoriteScale }] }}>
+              <Pressable
+                onPressIn={() => animateAction(favoriteScale, 0.82)}
+                onPressOut={() => animateAction(favoriteScale, 1)}
+                onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleFavorite(entry.id); }}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={entry.isFavorite ? 'Remove favorite' : 'Add favorite'}
+              >
+                <AppIcon name={entry.isFavorite ? 'star' : 'star-outline'} size={18} color={entry.isFavorite ? '#f59e0b' : colors.mutedForeground} />
+              </Pressable>
+            </Animated.View>
+          )}
+          {!selectable && (
+            <Animated.View style={{ transform: [{ scale: copyScale }] }}>
+              <Pressable
+                onPressIn={() => animateAction(copyScale, 0.88)}
+                onPressOut={() => animateAction(copyScale, 1)}
+                onPress={handleCopy}
+                style={[styles.copyBtn, { backgroundColor: colors.primary + '18' }]}
+                accessibilityRole="button"
+                accessibilityLabel="Copy password"
+              >
+                <AppIcon name="copy-outline" size={16} color={colors.primary} />
+              </Pressable>
+            </Animated.View>
+          )}
         </View>
         {selected && <View style={[styles.selectedBadge, { backgroundColor: colors.primary }]}><AppIcon name="checkmark" size={12} color="#fff" /></View>}
       </Pressable>

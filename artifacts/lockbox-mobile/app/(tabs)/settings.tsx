@@ -127,7 +127,7 @@ export default function SettingsScreen() {
           <Text style={[styles.segmentLabel, { color: colors.foreground }]}>Accent color</Text>
           <View style={styles.accentChoices}>
             {ACCENT_COLORS.map(color => (
-              <Pressable key={color} onPress={() => updateAppearance({ accentColor: color })} style={[styles.accentChoice, { backgroundColor: color }, accentColor === color && styles.accentChoiceActive]}>
+              <Pressable key={color} onPress={() => { void Haptics.selectionAsync(); updateAppearance({ accentColor: color }); }} style={({ pressed }) => [styles.accentChoice, { backgroundColor: color, opacity: pressed ? 0.78 : 1 }, accentColor === color && styles.accentChoiceActive]}>
                 {accentColor === color && <AppIcon name="checkmark" size={15} color="#fff" />}
               </Pressable>
             ))}
@@ -135,7 +135,7 @@ export default function SettingsScreen() {
           <Text style={[styles.segmentLabel, { color: colors.foreground, marginTop: 8 }]}>Icon pack</Text>
           <View style={styles.iconPackRow}>
             {(['ionicons', 'feather'] as const).map(pack => (
-              <Pressable key={pack} onPress={() => updateAppearance({ iconPack: pack })} style={[styles.iconPackBtn, { backgroundColor: iconPack === pack ? colors.primary : colors.muted }]}>
+              <Pressable key={pack} onPress={() => { void Haptics.selectionAsync(); updateAppearance({ iconPack: pack }); }} style={({ pressed }) => [styles.iconPackBtn, { backgroundColor: iconPack === pack ? colors.primary : colors.muted, opacity: pressed ? 0.82 : 1 }]}>
                 <AppIcon name={pack === 'ionicons' ? 'sparkles' : 'edit-outline'} size={16} color={iconPack === pack ? '#fff' : colors.mutedForeground} />
                 <Text style={[styles.iconPackText, { color: iconPack === pack ? '#fff' : colors.mutedForeground }]}>{pack === 'ionicons' ? 'Ionicons' : 'Feather'}</Text>
               </Pressable>

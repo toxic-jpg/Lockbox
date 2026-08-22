@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -36,6 +36,7 @@ export default function GeneratorScreen() {
   const [generated, setGenerated] = useState('');
   const [strength, setStrength] = useState(0);
   const [copied, setCopied] = useState(false);
+  const displayEntrance = useRef(new Animated.Value(1)).current;
 
   // Password opts
   const [length, setLength] = useState(16);
@@ -74,7 +75,24 @@ export default function GeneratorScreen() {
     setCopied(false);
   }, [mode, length, uppercase, lowercase, numbers, symbols, excludeSimilar, wordCount, separator, capitalize, memorableWords, pinLength]);
 
-  useEffect(() => { generate(); }, [mode]);
+  useEffect(() => {
+    generate();
+  }, [mode]);
+
+  useEffect(() => {
+    displayEntrance.setValue(0.96);
+    Animated.spring(displayEntrance, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 24,
+      bounciness: 5,
+    }).start();
+  }, [displayEntrance, generated]);
+
+  function handleGenerate() {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    generate();
+  }
 
   async function handleCopy() {
     if (!generated) return;
@@ -85,6 +103,7 @@ export default function GeneratorScreen() {
   }
 
   function handleSave() {
+    void Haptics.selectionAsync();
     router.push({ pathname: '/add', params: { prefill: generated } });
   }
 
@@ -128,7 +147,7 @@ export default function GeneratorScreen() {
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: botPad + 90 }]} showsVerticalScrollIndicator={false}>
 
         {/* Generated display */}
-        <View style={[styles.display, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Animated.View style={[styles.display, { backgroundColor: colors.card, borderColor: colors.border, transform: [{ scale: displayEntrance }] }]}>
           <Text style={[styles.generated, { color: colors.foreground }]} selectable numberOfLines={4} adjustsFontSizeToFit>
             {generated}
           </Text>
@@ -138,10 +157,10 @@ export default function GeneratorScreen() {
             </View>
           )}
           <View style={styles.displayActions}>
-            <Pressable style={[styles.displayBtn, { backgroundColor: colors.muted }]} onPress={generate}>
+             <Pressable style={[styles.displayBtn, { backgroundColor: colors.muted }]} onPress={handleGenerate}>
               <Ionicons name="refresh" size={20} color={colors.foreground} />
             </Pressable>
-            <Pressable style={[styles.displayBtn, { flex: 1, backgroundColor: copied ? '#10b981' : colors.primary }]} onPress={handleCopy}>
+             <Pressable style={[styles.displayBtn, { flex: 1, backgroundColor: copied ? '#10b981' : colors.primary }]} onPress={handleCopy}>
               <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={18} color="#fff" />
               <Text style={styles.displayBtnText}>{copied ? 'Copied!' : 'Copy'}</Text>
             </Pressable>
@@ -149,7 +168,7 @@ export default function GeneratorScreen() {
               <Ionicons name="save-outline" size={20} color={colors.foreground} />
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Mode tabs */}
         <View style={[styles.modeTabs, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -157,7 +176,7 @@ export default function GeneratorScreen() {
             <Pressable
               key={m.key}
               style={[styles.modeTab, mode === m.key && { backgroundColor: colors.primary }]}
-              onPress={() => setMode(m.key)}
+               onPress={() => { void Haptics.selectionAsync(); setMode(m.key); }}
             >
               <Ionicons name={m.icon as any} size={15} color={mode === m.key ? '#fff' : colors.mutedForeground} />
               <Text style={[styles.modeTabText, { color: mode === m.key ? '#fff' : colors.mutedForeground }]}>{m.label}</Text>
@@ -218,7 +237,7 @@ export default function GeneratorScreen() {
           )}
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <Pressable style={[styles.regenBtn, { backgroundColor: colors.primary }]} onPress={generate}>
+          <Pressable style={[styles.regenBtn, { backgroundColor: colors.primary }]} onPress={handleGenerate}>
             <Ionicons name="refresh" size={18} color="#fff" />
             <Text style={styles.regenText}>Regenerate</Text>
           </Pressable>

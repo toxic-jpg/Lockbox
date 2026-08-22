@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useVault } from '@/context/VaultContext';
@@ -91,7 +92,7 @@ export default function VaultScreen() {
           <Text style={[styles.title, { color: colors.foreground }]}>Vault</Text>
           <Text style={[styles.count, { color: colors.mutedForeground }]}>{manageMode ? `${selectedIds.size} selected` : `${processed.length} items`}</Text>
         </View>
-        <Pressable style={[styles.manageBtn, { backgroundColor: manageMode ? colors.primary : colors.muted }]} onPress={() => manageMode ? closeManageMode() : setManageMode(true)}>
+        <Pressable style={({ pressed }) => [styles.manageBtn, { backgroundColor: manageMode ? colors.primary : colors.muted, opacity: pressed ? 0.82 : 1 }]} onPress={() => { void Haptics.selectionAsync(); manageMode ? closeManageMode() : setManageMode(true); }}>
           <AppIcon name={manageMode ? 'close' : 'checkmark-circle-outline'} size={17} color={manageMode ? '#fff' : colors.primary} />
           <Text style={[styles.manageText, { color: manageMode ? '#fff' : colors.primary }]}>{manageMode ? 'Done' : 'Manage'}</Text>
         </Pressable>
@@ -129,7 +130,7 @@ export default function VaultScreen() {
           renderItem={({ item: f }) => (
             <Pressable
               style={[styles.chip, { backgroundColor: filter === f.key ? colors.primary : colors.muted, borderColor: filter === f.key ? colors.primary : colors.border }]}
-              onPress={() => setFilter(f.key)}
+              onPress={() => { void Haptics.selectionAsync(); setFilter(f.key); }}
             >
               <Ionicons name={f.icon as any} size={13} color={filter === f.key ? '#fff' : colors.mutedForeground} />
               <Text style={[styles.chipText, { color: filter === f.key ? '#fff' : colors.mutedForeground }]}>{f.label}</Text>
@@ -164,12 +165,12 @@ export default function VaultScreen() {
       />
 
       {/* FAB */}
-      {!manageMode && <Pressable style={[styles.fab, { backgroundColor: colors.primary }]} onPress={() => router.push('/add')}>
+       {!manageMode && <Pressable style={({ pressed }) => [styles.fab, { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.92 : 1 }] }]} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/add'); }}>
         <AppIcon name="add" size={28} color="#fff" />
       </Pressable>}
       {manageMode && selectedIds.size > 0 && <View style={[styles.batchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.batchCount, { color: colors.foreground }]}>{selectedIds.size} selected</Text>
-        <Pressable style={[styles.batchBtn, { backgroundColor: colors.primary }]} onPress={() => setBulkOpen(true)}>
+         <Pressable style={({ pressed }) => [styles.batchBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.84 : 1 }]} onPress={() => { void Haptics.selectionAsync(); setBulkOpen(true); }}>
           <AppIcon name="create-outline" size={17} color="#fff" />
           <Text style={styles.batchBtnText}>Edit tags & folder</Text>
         </Pressable>

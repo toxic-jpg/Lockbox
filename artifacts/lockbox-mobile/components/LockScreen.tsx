@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,17 +16,30 @@ export default function LockScreen() {
   const [confirmPin, setConfirmPin] = useState('');
   const [step, setStep] = useState<'create' | 'confirm' | 'unlock'>(hasPin ? 'unlock' : 'create');
   const [error, setError] = useState('');
-  const [shake, setShake] = useState(false);
+  const logoEntrance = useRef(new Animated.Value(0)).current;
+  const pinEntrance = useRef(new Animated.Value(0)).current;
+  const keypadEntrance = useRef(new Animated.Value(0)).current;
 
   const isSetup = step === 'create' || step === 'confirm';
   const currentPin = step === 'confirm' ? confirmPin : pin;
   const setCurrentPin = step === 'confirm' ? setConfirmPin : setPin;
+
+  useEffect(() => {
+    Animated.stagger(90, [
+      Animated.spring(logoEntrance, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 5 }),
+      Animated.spring(pinEntrance, { toValue: 1, useNativeDriver: true, speed: 18, bounciness: 4 }),
+      Animated.spring(keypadEntrance, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 3 }),
+    ]).start();
+  }, [keypadEntrance, logoEntrance, pinEntrance]);
 
   async function handleDigit(d: string) {
     if (currentPin.length >= PIN_LENGTH) return;
     const next = currentPin + d;
     setCurrentPin(next);
     setError('');
+    void Haptics.impactAsync(next.length === PIN_LENGTH
+      ? Haptics.ImpactFeedbackStyle.Medium
+      : Haptics.ImpactFeedbackStyle.Light);
     if (next.length === PIN_LENGTH) {
       await handleComplete(next);
     }
@@ -59,8 +72,10 @@ export default function LockScreen() {
   }
 
   function handleBackspace() {
+    if (!currentPin.length) return;
     setCurrentPin(prev => prev.slice(0, -1));
     setError('');
+    void Haptics.selectionAsync();
   }
 
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
@@ -74,16 +89,36 @@ export default function LockScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad + 20, paddingBottom: botPad + 20 }]}>
       {/* Logo */}
-      <View style={styles.logo}>
+      <Animated.View
+        style={[
+          styles.logo,
+          {
+            opacity: logoEntrance,
+            transform: [{
+              translateY: logoEntrance.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }),
+            }],
+          },
+        ]}
+      >
         <View style={[styles.logoIcon, { backgroundColor: colors.primary + '22' }]}>
           <Ionicons name="shield-checkmark" size={40} color={colors.primary} />
         </View>
         <Text style={[styles.logoText, { color: colors.foreground }]}>LockBox</Text>
         <Text style={[styles.logoSub, { color: colors.mutedForeground }]}>Password Vault</Text>
-      </View>
+      </Animated.View>
 
       {/* PIN label */}
-      <View style={styles.pinSection}>
+      <Animated.View
+        style={[
+          styles.pinSection,
+          {
+            opacity: pinEntrance,
+            transform: [{
+              translateY: pinEntrance.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }),
+            }],
+          },
+        ]}
+      >
         <Text style={[styles.pinTitle, { color: colors.foreground }]}>{title}</Text>
         <Text style={[styles.pinSubtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
 
@@ -104,39 +139,75 @@ export default function LockScreen() {
         {error ? (
           <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>
         ) : null}
-      </View>
+      </Animated.View>
 
       {/* Keypad */}
-      <View style={styles.keypad}>
+      <Animated.View
+        style={[
+          styles.keypad,
+          {
+            opacity: keypadEntrance,
+            transform: [{
+              translateY: keypadEntrance.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }),
+            }],
+          },
+        ]}
+      >
         {[['1','2','3'],['4','5','6'],['7','8','9'],['','0','⌫']].map((row, ri) => (
           <View key={ri} style={styles.row}>
             {row.map((key, ki) => {
               if (!key) return <View key={ki} style={styles.keyEmpty} />;
               const isBack = key === '⌫';
               return (
-                <Pressable
+                <KeypadKey
                   key={ki}
-                  style={({ pressed }) => [
-                    styles.key,
-                    { backgroundColor: pressed ? colors.muted : colors.card, borderColor: colors.border },
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    if (isBack) handleBackspace();
-                    else handleDigit(key);
-                  }}
+                  colors={colors}
+                  onPress={isBack ? handleBackspace : () => { void handleDigit(key); }}
                 >
                   {isBack
                     ? <Ionicons name="backspace-outline" size={24} color={colors.foreground} />
                     : <Text style={[styles.keyText, { color: colors.foreground }]}>{key}</Text>
                   }
-                </Pressable>
+                </KeypadKey>
               );
             })}
           </View>
         ))}
-      </View>
+      </Animated.View>
     </View>
+  );
+}
+
+interface KeypadKeyProps {
+  children: React.ReactNode;
+  colors: ReturnType<typeof useColors>;
+  onPress: () => void;
+}
+
+function KeypadKey({ children, colors, onPress }: KeypadKeyProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  function animateTo(value: number) {
+    Animated.spring(scale, {
+      toValue: value,
+      useNativeDriver: true,
+      speed: 28,
+      bounciness: 3,
+    }).start();
+  }
+
+  return (
+    <Animated.View style={[styles.key, { backgroundColor: colors.card, borderColor: colors.border }, { transform: [{ scale }] }]}>
+      <Pressable
+        style={({ pressed }) => [styles.keyPressable, { backgroundColor: pressed ? colors.muted : 'transparent' }]}
+        onPressIn={() => animateTo(0.92)}
+        onPressOut={() => animateTo(1)}
+        onPress={onPress}
+        accessibilityRole="button"
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -154,7 +225,8 @@ const styles = StyleSheet.create({
   error: { fontSize: 13, fontFamily: 'Inter_500Medium', marginTop: 4 },
   keypad: { width: '100%', gap: 12 },
   row: { flexDirection: 'row', justifyContent: 'center', gap: 16 },
-  key: { width: 80, height: 80, borderRadius: 40, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  key: { width: 80, height: 80, borderRadius: 40, borderWidth: 1, overflow: 'hidden' },
+  keyPressable: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
   keyEmpty: { width: 80, height: 80 },
   keyText: { fontSize: 26, fontFamily: 'Inter_500Medium' },
 });
