@@ -66,8 +66,11 @@ export default function VaultScreen() {
   }
 
   async function applyBulkEdit() {
+    // Empty tag field means "don't change tags", not "clear them" — pass undefined
+    // so the spread in bulkUpdateEntries is a no-op instead of overwriting with [].
+    const tagList = bulkTags.split(',').map(tag => tag.trim()).filter(Boolean);
     await bulkUpdateEntries(Array.from(selectedIds), {
-      tags: bulkTags.split(',').map(tag => tag.trim()).filter(Boolean),
+      tags: tagList.length > 0 ? tagList : undefined,
       folder: bulkFolder.trim() || undefined,
     });
     setBulkOpen(false);
